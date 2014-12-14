@@ -1,7 +1,7 @@
 {
     "name": "chippyash/slim-dic",
     "description": "Symfony DIC integration for the Slim Framework",
-    "homepage" : "https://github.com/chippyash/Slim-Dic",
+    "homepage" : "http://the-matrix.github.io/",
     "license": "GPL 3.0",
     "keywords": ["symfony","dependency","injection","slim","web"],
     "authors": [
