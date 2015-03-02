@@ -11,6 +11,8 @@ for a [Slim Application](http://www.slimframework.com/)
 
 Also provides a minimalist Controller pattern class for use in your applications.
 
+For an example application that uses this library, please see [Slim-DIC Example](https://github.com/the-matrix/Slim-Dic-Example)
+
 ## Why?
 
 The Slim framework is great for lightweight sites but lacks the ease of creating
@@ -20,10 +22,7 @@ This small library supports the integration of the easy to use, yet powerful
 Symfony version of a DI container with the lightweight Slim Framework, giving 
 you the ability to create great, maintainable and configurable web sites quickly.
 
-## When
-
-## How
-
+## How?
 
 ## Changing the library
 
@@ -45,19 +44,19 @@ NB. Make sure you rebase to HEAD before your pull request
 The library is hosted at [Github](https://github.com/chippyash/Slim-Dic). It is
 available at [Packagist.org](https://packagist.org/packages/chippyash/slim-dic)
 
+See [The (PHP) Matrix](http://the-matrix.github.io/packages/) for more PHP packages from
+this author.
+
 ### Installation
 
 Install [Composer](https://getcomposer.org/)
 
 #### For production
 
-If you do not need GMP support, you can continue to use the V1.1 branch for the
-time being.
- 
 add
 
 <pre>
-    "chippyash/slim-dic": "dev-master"
+    "chippyash/slim-dic": "~1.0"
 </pre>
 
 to your composer.json "requires" section
@@ -80,3 +79,5 @@ To run the tests:
 </pre>
 
 ## History
+
+V1.0.0 Initial release
