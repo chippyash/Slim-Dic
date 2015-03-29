@@ -88,10 +88,19 @@ abstract class AbstractController
         if (!is_null($controller)) {
             $tpl = "{$controller}/{$template}";
         } else {
-            $ctrlClassParts = explode('\\', get_class($this));
-            $ctrl = strtolower(str_replace('Controller', '', array_pop($ctrlClassParts)));
+            $ctrl = $this->controllerName();
             $tpl = "{$ctrl}/{$template}";
         }
         $this->app->render($tpl, $data, $status);
+    }
+
+    /**
+     * Name of this controller
+     * @return string
+     */
+    protected function controllerName()
+    {
+        $ctrlClassParts = explode('\\', get_class($this));
+        return strtolower(str_replace('Controller', '', array_pop($ctrlClassParts)));
     }
 }

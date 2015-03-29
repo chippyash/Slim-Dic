@@ -81,3 +81,4 @@ To run the tests:
 ## History
 
 V1.0.0 Initial release
+V1.0.1 Refactor getting controller name
