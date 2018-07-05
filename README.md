@@ -77,8 +77,16 @@ To run the tests:
     cd Slimdic
     vendor/bin/phpunit -c test/phpunit.xml test/
 </pre>
+## License
+
+This software library is released under the [BSD 3 Clause license](https://opensource.org/licenses/BSD-3-Clause)
+
+This software library is Copyright (c) 2014-2018, Ashley Kitson, UK
 
 ## History
 
 V1.0.0 Initial release
+
 V1.0.1 Refactor getting controller name
+
+V1.1.0 Change of license from GPL V3 to BSD 3 Clause 

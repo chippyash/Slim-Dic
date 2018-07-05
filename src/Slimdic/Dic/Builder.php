@@ -1,195 +1,177 @@
 <?php
 /**
  * Chippyash Slim DIC integration
+ *
+ * For Slim V3
  * 
  * DIC builder
  * 
  * @author Ashley Kitson
- * @copyright Ashley Kitson, 2014, UK
+ * @copyright Ashley Kitson, 2014-2016, UK
  */
 namespace Slimdic\Dic;
 
-use chippyash\Type\String\StringType;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Assembler\FFor;
+use Assembler\Traits\ParameterGrabable;
+use Chippyash\Type\BoolType;
+use Chippyash\Type\String\StringType;
+use Monad\FTry;
+use Monad\Match;
+use Monad\Option;
+use Slim\App;
 use Symfony\Component\DependencyInjection\Loader\XmlFileLoader;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\Dumper\PhpDumper;
 use Symfony\Component\DependencyInjection\Dumper\XmlDumper;
-use Slimdic\Environment;
 
 /**
- * Builder to compile the dic and return the application 
+ * Builder to compile the dic and return the application
+ * containing the DIC
  */
 abstract class Builder
 {
-    /**
-     * Base directory name for spool directory
-     */
-    const SPOOL_DIR = '/spool';
-    
-    /**
-     * Template cache directory inside spool directory
-     */
-    const TPL_CACHE_DIR = '/tplcache';
+    use ParameterGrabable;
 
-    /**
-     * Application log directory inside spool directory
-     */
-    const LOG_DIR = '/logs';
-    
     /**
      * DIC php cache name
      */
-    const CACHE_PHP_NAME = '/spool/dic.cache.php';
+    const CACHE_PHP_NAME = '/dic.cache.php';
     
     /**
      * DIC XML cache name - written if environment mode == development
      */
-    const CACHE_XML_NAME = '/spool/dic.cache.xml';
-    
-    /**
-     * Template for DIC source file name
-     */
-    const DIC_SOURCE_TPL_NAME = '%s/Site/cfg/dic.%s.xml';
+    const CACHE_XML_NAME = '/dic.cache.xml';
     
     /**
      * Error string
      */
     const ERR_NO_DIC = 'Cannot find DIC definition';
+
+    /**
+     * Error string
+     */
+    const ERR_NO_CACHE_DIR = 'Cache directory does not exist';
     
     /**
-     * Name of parameter inside DIC definition for baseDirectory
+     * Build the DIC and return the Slim\App application component
+     *
+     * The DIC will be available as app->getContainer()
+     *
+     * @param StringType $definitionXmlFile full path to xml dic definition file
+     * @param StringType $cacheDir path to directory to store dic cached version
+     * @param BoolType $cacheTheDic If true then attempt to load dic from cache and write it if not found
+     * @param BoolType $dumpResolvedXmlFile If true will also dump the DI as a fully resolved xml file
+     *
+     * @throws \Exception
+     *
+     * @return \Slim\App
      */
-    const DIC_PARAM_BASE_DIR = 'baseDir';
-    
-    /**
-     * Name of parameter inside DIC definition for template (view script) cache
-     */
-    const DIC_PARAM_TPLCACHE_DIR = 'tplCacheDir';
-    
-    /**
-     * Name of parameter inside DIC definition for logging directory
-     */
-    const DIC_PARAM_LOGDIR = 'logDir';
-    
-    /**
-     * Name of service inside DIC for the Slim application
-     */
-    const DIC_SRVC_SLIM_APP_NAME = 'slim.app';
-    
-    /**
-     * chmod mode to set spool directory components
-     */
-    const CHMOD_MODE = 0755;
-    
-    /**
-     * Build the DIC and return the Slim\Slim app component
-     * The DIC will be available as app->dic
-     * If environment !== 'development' then will create cached version of
-     * DIC for subsequent use
-     * 
-     * @param StringType $baseDir Base dierctory of the application
-     * @param StringType $environment environment mode
-     * @return \Slim\Slim
-     */
-    public static function getApp(StringType $baseDir, StringType $environment)
+    public static function getApp(
+        StringType $definitionXmlFile,
+        StringType $cacheDir,
+        BoolType $cacheTheDic = null,
+        BoolType $dumpResolvedXmlFile = null)
     {
-        $diCacheName = $baseDir . self::CACHE_PHP_NAME;
-        if ($environment() != Environment::ENVSTATE_DEV && file_exists($diCacheName)) {
-            //use the cached version
-            require_once $diCacheName;
-            $dic = new \ProjectServiceContainer();
-        } else {
-            $dic = self::buildDic($baseDir, $environment);
-        }       
-        
-        $app = $dic->get(self::DIC_SRVC_SLIM_APP_NAME);
-        $app->dic = $dic;
-        
-        return $app;
+        return FFor::create(self::grabFunctionParameters(__CLASS__, __FUNCTION__, func_get_args()))
+            ->caching(function($cacheTheDic) {
+                return Match::on($cacheTheDic)
+                    ->null(function() {return false;})
+                    ->any(function($cacheTheDic) {return $cacheTheDic();})
+                    ->value();
+            })
+            ->noCacheTest(function($cacheDir, $caching) {
+                Match::on(Option::create($caching && !file_exists($cacheDir()), false))
+                    ->Monad_Option_Some(function() {
+                        throw new \Exception(self::ERR_NO_CACHE_DIR);
+                    });
+            })
+            ->diCacheName(function($cacheDir) {
+                return $cacheDir . self::CACHE_PHP_NAME;
+            })
+            ->app(function($caching, $diCacheName, $definitionXmlFile, $cacheDir, $cacheTheDic, $dumpResolvedXmlFile) {
+                return new App(
+                    Match::on(Option::create($caching && file_exists($diCacheName), false))
+                        ->Monad_Option_Some(function() use ($diCacheName) {
+                            require_once $diCacheName;
+                            return new \ProjectServiceContainer();
+                        })
+                        ->Monad_Option_None(function() use ($definitionXmlFile, $cacheDir, $cacheTheDic, $dumpResolvedXmlFile) {
+                            return self::buildDic($definitionXmlFile, $cacheDir, $cacheTheDic, $dumpResolvedXmlFile);
+                        })
+                        ->value()
+                );
+            })
+            ->fyield('app');
     }
     
     /**
-     * Build and return the DIC 
-     * Will set a parameter 'baseDir' into the DI container
-     * Stores cached version of DIC and if environment == 'development', will
+     * Build and return the DIC
+     *
+     * Stores cached version of DIC. If $dumpResolvedXmlFile == true, will
      * also write out an xml version in the same location which can be helpful
      * for debugging
      * 
-     * @param StringType $baseDir
-     * @param StringType $environment
-     * 
-     * @return Symfony\Component\DependencyInjection\ContainerBuilder
-     * 
+     * @param StringType $definitionXmlFile full path to xml dic definition file
+     * @param StringType $cacheDir path to directory to store dic cached version
+     * @param BoolType $cacheTheDic If true then attempt to load dic from cache and write it if not found
+     * @param BoolType $dumpResolvedXmlFile If true will also dump the DI as a fully resolved xml file
+     *
      * @throws \Exception
+     *
+     * @return Container
      */
-    public static function buildDic(StringType $baseDir, StringType $environment)
+    public static function buildDic(
+        StringType $definitionXmlFile,
+        StringType $cacheDir,
+        BoolType $cacheTheDic = null,
+        BoolType $dumpResolvedXmlFile = null)
     {
-        $diName = sprintf(self::DIC_SOURCE_TPL_NAME, $baseDir, $environment);
-        if (!file_exists($diName)) {
+        if (!file_exists($definitionXmlFile())) {
             throw new \Exception(self::ERR_NO_DIC);
         }
-        
-        //create dic and cache it
-        $dic = new ContainerBuilder();
-        $loader = new XmlFileLoader($dic, new FileLocator(dirname($diName)));
-        $loader->load($diName);
 
-        self::setSpoolDir($dic, $baseDir);
-        
-        $dic->compile();
-        $dumper = new PhpDumper($dic);
+        if (!file_exists($cacheDir())) {
+            throw new \Exception(self::ERR_NO_CACHE_DIR);
+        }
 
-        $diCacheName = $baseDir . self::CACHE_PHP_NAME;
-        file_put_contents($diCacheName, $dumper->dump());
-        
-        if ($environment() == Environment::ENVSTATE_DEV) {
-            $xmlCacheName = $baseDir . self::CACHE_XML_NAME;
+        //create dic
+        $dic = FFor::create(['definitionXmlFile' => $definitionXmlFile])
+            //create the DIC
+            ->dic(function(){
+                return new Container();
+            })
+            //do some processing on the DIC
+            ->process(function($dic, $definitionXmlFile) {
+                $loader = new XmlFileLoader($dic, new FileLocator(dirname($definitionXmlFile())));
+                $loader->load($definitionXmlFile());
+                $dic->compile();
+            })
+            //return the completed DIC
+            ->fyield('dic');
+
+        //and cache it
+        if (!is_null($cacheTheDic) && $cacheTheDic()) {
+            $dumper = new PhpDumper($dic);
+            $diCacheName = $cacheDir . self::CACHE_PHP_NAME;
+            file_put_contents($diCacheName, $dumper->dump(['base_class' => 'Slimdic\Dic\Container']));
+        }
+
+        if (!is_null($dumpResolvedXmlFile) && $dumpResolvedXmlFile()) {
+            $xmlCacheName = $cacheDir . self::CACHE_XML_NAME;
             $xmlDumper = new XmlDumper($dic);
             file_put_contents($xmlCacheName, $xmlDumper->dump());
         }
         
         return $dic;
     }
-    
+
     /**
-     * Setup up the spool directory components
-     * 
-     * @param ContainerBuilder $dic
-     * @param StringType $baseDir
+     * Helper function for dic - simply returns $_SERVER
+     *
+     * @return array
      */
-    protected static function setSpoolDir(ContainerBuilder $dic, StringType $baseDir)
+    public static function getServerConfig()
     {
-        $spoolDir = $baseDir . self::SPOOL_DIR;
-        $tplCacheDir = $spoolDir . self::TPL_CACHE_DIR;
-        $logDir = $spoolDir . self::LOG_DIR;
-        
-        //make sure we have a spool directory that we can access
-        if (!file_exists($spoolDir)) {
-            mkdir($spoolDir);
-        }
-        if (!is_writable($spoolDir)) {
-            chmod($spoolDir, self::CHMOD_MODE);
-        }
-        //make sure we have a view script template cache directory we can access
-        if (!file_exists($tplCacheDir)) {
-            mkdir($tplCacheDir);
-        }
-        if (!is_writable($tplCacheDir)) {
-            chmod($tplCacheDir, self::CHMOD_MODE);
-        }
-        
-        //make sure we have a logging directory we can access
-        if (!file_exists($logDir)) {
-            mkdir($logDir);
-        }
-        if (!is_writable($logDir)) {
-            chmod($logDir, self::CHMOD_MODE);
-        }
-        
-        //inject parameters into DIC so it will compile
-        $dic->setParameter(self::DIC_PARAM_BASE_DIR, $baseDir());
-        $dic->setParameter(self::DIC_PARAM_TPLCACHE_DIR, $tplCacheDir);
-        $dic->setParameter(self::DIC_PARAM_LOGDIR, $logDir);
+        return $_SERVER;
     }
 }

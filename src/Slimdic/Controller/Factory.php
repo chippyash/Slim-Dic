@@ -9,9 +9,10 @@
  */
 namespace Slimdic\Controller;
 
-use Slim\Slim;
-use chippyash\Type\String\StringType;
-use Slimdic\Controller\AbstractController;
+use Slim\App;
+use Chippyash\Type\String\StringType;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Factory class to create controllers
@@ -28,21 +29,23 @@ abstract class Factory
     /** 
      * Factory method to create a controller
      * 
-     * @param Slim $app  Slim application object
+     * @param App $app  Slim application object
+     * @param ServerRequestInterface $request Request object
+     * @param ResponseInterface $response Response object
      * @param StringType $ctrlName Namespace name for controller
      * @param array $config Arbitrary configuration for the controller
      * 
-     * @return Slimdic\Controller\AbstractController
+     * @return AbstractController
      * 
      * @throws \Exception
      */
-    public static function create(Slim $app, StringType $ctrlName, array $config = [])
+    public static function create(App $app, ServerRequestInterface $request, ResponseInterface $response, StringType $ctrlName, array $config = [])
     {
         $cName = $ctrlName();
         if (!class_exists($cName)) {
             throw new \Exception("Class {$cName} does not exist");
         }
-        $ctrl = new $cName($app, $config);
+        $ctrl = new $cName($app, $request, $response, $config);
         if (!$ctrl instanceof AbstractController) {
             throw new \Exception("{$cName} is not an instance of AbstractController");
         }
@@ -52,15 +55,15 @@ abstract class Factory
     
     /**
      * 
-     * @param Slim $app
+     * @param App $app
      * @param String $ctrlName
      * @param array $config
      * @return \Slimdic\Controller\AbstractController
      */
-    protected function createController(Slim $app, $ctrlName, array $config = [])
-    {
-        $ctrl = new $ctrlName($app, $config);
-        
-        return $ctrl;
-    }
+//    protected function createController(App $app, $ctrlName, array $config = [])
+//    {
+//        $ctrl = new $ctrlName($app, $config);
+//
+//        return $ctrl;
+//    }
 }

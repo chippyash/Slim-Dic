@@ -9,7 +9,9 @@
  */
 namespace Slimdic\Controller;
 
-use Slim\Slim;
+use Slim\App;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Base abstract controller
@@ -18,7 +20,7 @@ abstract class AbstractController
 {
     /**
      *
-     * @var \Slim\Slim
+     * @var \Slim\App
      */
     protected $app;
     
@@ -48,14 +50,17 @@ abstract class AbstractController
     /**
      * Constructor
      * 
-     * @param Slim $app
+     * @param Slim $app                         The application
+     * @param ServerRequestInterface $request   The request
+     * @param ResponseInterface $response       The response
+     * @param array $config                     Optional additional configuration
      */
-    public function __construct(Slim $app, array $config = [])
+    public function __construct(App $app, ServerRequestInterface $request, ResponseInterface $response, array $config = [])
     {
         $this->app = $app;
-        $this->dic = $app->dic;
-        $this->request = $app->request();
-        $this->response = $app->response();
+        $this->dic = $app->getContainer();
+        $this->request = $request;
+        $this->response = $response;
         $this->config = $config;
     }
     
